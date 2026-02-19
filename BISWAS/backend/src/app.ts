@@ -8,8 +8,7 @@ const app = express();
 app.use(cors()); // Allow frontend to talk to backend
 app.use(express.json()); // Parse JSON bodies
 
-// Routes
-// This means any route in 'userRoutes' will start with '/api/users'
+// Routes firs one is user routes, 
 app.use('/api/users', userRoutes);
 
 export default app;
