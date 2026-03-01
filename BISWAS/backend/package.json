@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts",
+    "dev": "npx tsx src/server.ts",
     "build": "tsc"
   },
   "dependencies": {
@@ -9,6 +9,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-oauth2-jwt-bearer": "^1.7.4",
     "nodemon": "^3.1.11",
     "pg": "^8.16.3"
   },
