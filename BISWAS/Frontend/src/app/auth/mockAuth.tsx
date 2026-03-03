@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { Auth0Provider as RealAuth0Provider, useAuth0 as realUseAuth0 } from '@auth0/auth0-react'
 
 type MockAuth = {
@@ -7,12 +7,12 @@ type MockAuth = {
   loginWithRedirect: () => Promise<void> | void
   logout: (opts?: any) => void
   user?: any
+  getAccessTokenSilently: (opts?: any) => Promise<string> // <-- Added this
 }
 
 const MockContext = createContext<MockAuth | null>(null)
 
 export function Auth0Provider({ domain, clientId, children, authorizationParams }: any) {
-  // If real Auth0 config is provided, use the real provider
   if (domain && clientId) {
     return (
       <RealAuth0Provider domain={domain} clientId={clientId} authorizationParams={authorizationParams}>
@@ -21,7 +21,6 @@ export function Auth0Provider({ domain, clientId, children, authorizationParams 
     )
   }
 
-  // Otherwise provide a simple mock auth context for local testing
   const [isAuthenticated, setIsAuthenticated] = useState(true)
   const [isLoading] = useState(false)
 
@@ -33,10 +32,16 @@ export function Auth0Provider({ domain, clientId, children, authorizationParams 
     setIsAuthenticated(false)
   }
 
-  const user = isAuthenticated ? { name: 'Demo User', email: 'demo@local' } : undefined
+  // <-- Added this mock function
+  const getAccessTokenSilently = async () => {
+    return "mock-token-for-local-testing"
+  }
+
+  const user = isAuthenticated ? { sub: 'mock-auth0-id|123', name: 'Demo User', email: 'demo@local' } : undefined
 
   return (
-    <MockContext.Provider value={{ isAuthenticated, isLoading, loginWithRedirect, logout, user }}>
+    // <-- Added getAccessTokenSilently to the Provider value
+    <MockContext.Provider value={{ isAuthenticated, isLoading, loginWithRedirect, logout, user, getAccessTokenSilently }}>
       {children}
     </MockContext.Provider>
   )

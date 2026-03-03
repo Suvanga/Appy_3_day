@@ -4,45 +4,50 @@ import { Calendar, LogOut, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const MOTIVATIONAL_QUOTES = [
-  {
-    quote: "Success is the sum of small efforts repeated day in and day out.",
-    author: "Robert Collier"
-  },
-  {
-    quote: "The secret of getting ahead is getting started.",
-    author: "Mark Twain"
-  },
-  {
-    quote: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.",
-    author: "Aristotle"
-  },
-  {
-    quote: "The only way to do great work is to love what you do.",
-    author: "Steve Jobs"
-  },
-  {
-    quote: "Don't watch the clock; do what it does. Keep going.",
-    author: "Sam Levenson"
-  },
-  {
-    quote: "The future depends on what you do today.",
-    author: "Mahatma Gandhi"
-  },
-  {
-    quote: "Your limitation—it's only your imagination.",
-    author: "Unknown"
-  },
-  {
-    quote: "Great things never come from comfort zones.",
-    author: "Unknown"
-  },
+  { quote: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
+  { quote: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { quote: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", author: "Aristotle" },
+  { quote: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+  { quote: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+  { quote: "The future depends on what you do today.", author: "Mahatma Gandhi" },
+  { quote: "Your limitation—it's only your imagination.", author: "Unknown" },
+  { quote: "Great things never come from comfort zones.", author: "Unknown" },
 ];
 
 export function HomePage() {
-  const { user, logout } = useAuth0();
+  const { user, logout, isAuthenticated, getAccessTokenSilently } = useAuth0();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quote] = useState(() => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
 
+  // THIS IS THE NEW BACKEND SYNC EFFECT
+  useEffect(() => {
+    const syncUserToBackend = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const token = await getAccessTokenSilently();
+          const response = await fetch("http://localhost:5002/api/users", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              auth0_id: user.sub,
+              email: user.email,
+            }),
+          });
+          const data = await response.json();
+          console.log("Supabase User Sync:", data);
+        } catch (error) {
+          console.error("Failed to sync user to backend:", error);
+        }
+      }
+    };
+
+    syncUserToBackend();
+  }, [isAuthenticated, user, getAccessTokenSilently]);
+
+  // Original clock timer effect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -53,19 +58,13 @@ export function HomePage() {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
     });
   };
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
   };
 
