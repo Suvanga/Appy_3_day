@@ -9,6 +9,7 @@ export interface Completion {
   date: string;
   friction: number;
   note: string;
+  progress?: number; // Optional field to track how much progress was made during this check-in
 }
 
 export interface Habit {
@@ -18,4 +19,5 @@ export interface Habit {
   type: "growth" | "maintenance";
   completions: Completion[];
   createdAt: string;
+  progress?: number; // Optional field to track overall progress for the habit
 }

@@ -18,20 +18,19 @@ export function GoalCard({ goal, habits, onToggleHabit }: GoalCardProps) {
   const totalHabits = goalHabits.length;
   const completionPercentage = totalHabits > 0 ? (completedToday / totalHabits) * 100 : 0;
 
-  // Calculate total impact score for the goal
-  const totalImpactScore = goalHabits.reduce((sum, habit) => {
-    const recentCompletions = habit.completions.slice(-7); // Last 7 days
-    const avgFriction = recentCompletions.length > 0
-      ? recentCompletions.reduce((s, c) => s + (c.friction || 3), 0) / recentCompletions.length
-      : 3;
-    
-    // Impact Score: consistency * difficulty adjustment
-    const consistency = (recentCompletions.length / 7) * 100;
-    const difficultyMultiplier = avgFriction / 3; // Higher friction = higher impact
-    return sum + (consistency * difficultyMultiplier);
+  // NEW SIMPLE MATH: Sum up all progress made across all habits for this specific goal
+  const currentProgress = goalHabits.reduce((goalSum, habit) => {
+    const habitSum = habit.completions.reduce((sum, completion) => {
+      return sum + (completion.progress || 0);
+    }, 0);
+    return goalSum + habitSum;
   }, 0);
 
-  const avgImpactScore = goalHabits.length > 0 ? Math.round(totalImpactScore / goalHabits.length) : 0;
+  // Target value (defaults to 100 for now until we update AddGoalDialog)
+  const targetValue = 100;
+  
+  // Cap the circle at 100% so the visual ring doesn't break if they go over
+  const circlePercentage = Math.min((currentProgress / targetValue) * 100, 100);
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
@@ -47,7 +46,7 @@ export function GoalCard({ goal, habits, onToggleHabit }: GoalCardProps) {
           )}
         </div>
         
-        {/* Impact Score Ring */}
+        {/* Progress Score Ring */}
         <div className="flex flex-col items-center">
           <div className="relative w-16 h-16">
             <svg className="w-16 h-16 transform -rotate-90">
@@ -66,15 +65,15 @@ export function GoalCard({ goal, habits, onToggleHabit }: GoalCardProps) {
                 stroke="#F97316"
                 strokeWidth="6"
                 fill="none"
-                strokeDasharray={`${(avgImpactScore / 100) * 175.93} 175.93`}
+                strokeDasharray={`${(circlePercentage / 100) * 175.93} 175.93`}
                 strokeLinecap="round"
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm text-[#1E293B]">{avgImpactScore}</span>
+              <span className="text-sm font-bold text-[#1E293B]">{currentProgress}</span>
             </div>
           </div>
-          <span className="text-xs text-gray-500 mt-1">Impact</span>
+          <span className="text-xs text-gray-500 mt-1">Progress</span>
         </div>
       </div>
 

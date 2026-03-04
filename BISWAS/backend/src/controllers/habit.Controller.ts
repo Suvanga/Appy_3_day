@@ -56,38 +56,39 @@ export const createHabit = async (req: Request, res: Response): Promise<void> =>
 
 // POST /api/habits/:id/log
 // Creates a check-in (HabitLog) for a specific habit
+// POST /api/habits/:id/log
 export const checkInHabit = async (req: Request, res: Response): Promise<void> => {
   try {
     const auth0Id = req.auth?.payload.sub;
     const habit_id = req.params.id;
-    const { status, friction_rating, friction_note, date } = req.body;
+    // We added progress_made to the incoming request body
+    const { status, friction_rating, friction_note, date, progress_made } = req.body;
 
     if (!auth0Id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    // Security check: ensure the user owns the goal that owns this habit
     const habit = await prisma.habit.findUnique({
       where: { id: habit_id },
       include: { goal: true }
     });
 
-    // Check if habit exists and if the logged-in user's internal ID matches the goal's user_id
     const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id }});
     if (!habit || !user || habit.goal.user_id !== user.id) {
       res.status(403).json({ error: 'Forbidden: You do not own this habit' });
       return;
     }
 
-    // Create the Habit Log
+    // Create the Habit Log with the user's custom progress
     const habitLog = await prisma.habitLog.create({
       data: {
         habit_id,
-        status: status ?? true, // Default to true if they are checking in
+        status: status ?? true,
         friction_rating: friction_rating || null,
         friction_note: friction_note || null,
-        date: date ? new Date(date) : new Date(), // Use provided date or today
+        date: date ? new Date(date) : new Date(),
+        progress_made: progress_made ? parseInt(progress_made) : 1, // Default to 1 if they don't specify
       },
     });
 

@@ -50,14 +50,15 @@ model Habit {
 }
 
 model HabitLog {
-  id             String   @id @default(uuid())
-  habit_id       String
-  habit          Habit    @relation(fields: [habit_id], references: [id])
-  completed_at   DateTime @default(now())
-  status         Boolean  @default(false)
+  id              String   @id @default(uuid())
+  habit_id        String
+  habit           Habit    @relation(fields: [habit_id], references: [id])
+  completed_at    DateTime @default(now())
+  status          Boolean  @default(false)
   friction_rating Int?
-  friction_note  String?
-  date           DateTime @db.Date
+  friction_note   String?
+  date            DateTime @db.Date
+  progress_made   Int      @default(1) // <-- NEW: Tracks how much progress they made!
 
   @@map("habit_logs")
 }
