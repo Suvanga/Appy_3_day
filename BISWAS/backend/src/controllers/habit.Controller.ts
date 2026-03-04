@@ -1,0 +1,99 @@
+import { Request, Response } from 'express';
+import  prisma  from '../config/db';
+
+// POST /api/habits
+// Creates a new habit attached to a specific goal
+export const createHabit = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const auth0Id = req.auth?.payload.sub;
+    const { goal_id, name, type, frequency } = req.body;
+
+    if (!auth0Id) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // 1. Verify the user exists
+    const user = await prisma.user.findUnique({
+      where: { auth0_id: auth0Id },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // 2. Verify the goal exists AND belongs to this user
+    const goal = await prisma.goal.findFirst({
+      where: { 
+        id: goal_id,
+        user_id: user.id 
+      },
+    });
+
+    if (!goal) {
+      res.status(404).json({ error: 'Goal not found or does not belong to user' });
+      return;
+    }
+
+    // 3. Create the Habit
+    const newHabit = await prisma.habit.create({
+      data: {
+        goal_id,
+        name,
+        type: type || 'growth',
+        frequency: frequency || 'daily',
+        impact_score: 1, // Default impact score
+      },
+    });
+
+    res.status(201).json(newHabit);
+  } catch (error) {
+    console.error('Error creating habit:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// POST /api/habits/:id/log
+// Creates a check-in (HabitLog) for a specific habit
+export const checkInHabit = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const auth0Id = req.auth?.payload.sub;
+    const habit_id = req.params.id;
+    const { status, friction_rating, friction_note, date } = req.body;
+
+    if (!auth0Id) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Security check: ensure the user owns the goal that owns this habit
+    const habit = await prisma.habit.findUnique({
+      where: { id: habit_id },
+      include: { goal: true }
+    });
+
+    // Check if habit exists and if the logged-in user's internal ID matches the goal's user_id
+    const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id }});
+    if (!habit || !user || habit.goal.user_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden: You do not own this habit' });
+      return;
+    }
+
+    // Create the Habit Log
+    const habitLog = await prisma.habitLog.create({
+      data: {
+        habit_id,
+        status: status ?? true, // Default to true if they are checking in
+        friction_rating: friction_rating || null,
+        friction_note: friction_note || null,
+        date: date ? new Date(date) : new Date(), // Use provided date or today
+      },
+    });
+
+    res.status(201).json(habitLog);
+  } catch (error) {
+    console.error('Error logging habit:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
