@@ -23,13 +23,13 @@ model User {
 }
 
 model Goal {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   user_id      String
-  user         User     @relation(fields: [user_id], references: [id])
+  user         User      @relation(fields: [user_id], references: [id])
   title        String
   target_value Int
   deadline     DateTime?
-  status       String   @default("active")
+  status       String    @default("active")
   habits       Habit[]
 
   @@map("goals")
