@@ -3,16 +3,18 @@ import { X, CheckCircle } from "lucide-react";
 
 interface FrictionModalProps {
   habitName: string;
-  onComplete: (friction: number, note: string) => void;
+  // 1. We added 'progress: number' to the onComplete function
+  onComplete: (friction: number, note: string, progress: number) => void;
   onCancel: () => void;
 }
 
 export function FrictionModal({ habitName, onComplete, onCancel }: FrictionModalProps) {
   const [friction, setFriction] = useState(3);
   const [note, setNote] = useState("");
+  const [progress, setProgress] = useState(1); // 2. New state for tracking progress amount
 
   const handleSubmit = () => {
-    onComplete(friction, note);
+    onComplete(friction, note, progress); // 3. Pass the progress when submitting
   };
 
   const frictionLabels = ["Very Easy", "Easy", "Moderate", "Hard", "Very Hard"];
@@ -93,6 +95,20 @@ export function FrictionModal({ habitName, onComplete, onCancel }: FrictionModal
             <span>4</span>
             <span>5</span>
           </div>
+        </div>
+
+        {/* NEW: Progress Input */}
+        <div className="mb-6">
+          <label className="block text-sm text-gray-600 mb-2">
+            Progress Made (e.g., miles, pages, reps)
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={progress}
+            onChange={(e) => setProgress(Number(e.target.value))}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+          />
         </div>
 
         {/* Optional Note */}

@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import { getGoals, createGoal } from '../controllers/goal.Controller';
+// Add deleteGoal to this import!
+import { getGoals, createGoal, deleteGoal } from '../controllers/goal.Controller'; 
 import { checkJwt } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Protect all goal routes with checkJwt
 router.use(checkJwt);
 
 router.get('/', getGoals);
 router.post('/', createGoal);
+// Add the new delete route!
+router.delete('/:id', deleteGoal); 
 
 export default router;

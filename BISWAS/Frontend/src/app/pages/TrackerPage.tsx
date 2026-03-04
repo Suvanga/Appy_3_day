@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth0 } from "../auth/mockAuth";
 import { LayoutDashboard, Sparkles, Trash2, LogOut, Home } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -9,98 +9,106 @@ import { FrictionModal } from "../components/FrictionModal";
 import type { Goal, Habit } from "../types";
 
 export function TrackerPage() {
-  const { logout, isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const { logout, getAccessTokenSilently } = useAuth0();
   const [activeTab, setActiveTab] = useState<"dashboard" | "insights">("dashboard");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [checkInHabit, setCheckInHabit] = useState<Habit | null>(null);
 
-  // 1. FETCH DATA FROM DATABASE (Replaces Local Storage Load)
-  useEffect(() => {
-    const fetchTrackerData = async () => {
-      if (!isAuthenticated) return;
-
-      try {
-        const token = await getAccessTokenSilently();
-        
-        const response = await fetch("http://localhost:5002/api/goals", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-           // Ensure the frontend maps database 'title' to what the UI expects
-           const mappedGoals = data.map(g => ({ ...g, name: g.title || g.name }));
-           setGoals(mappedGoals);
-           
-           // Extract all habits from all goals into one flat array for the UI
-           const allHabits = data.flatMap(goal => {
-             return (goal.habits || []).map((h: any) => ({
-               ...h,
-               goalId: h.goal_id,
-               completions: [] // UI state for today's completion
-             }));
-           });
-           setHabits(allHabits);
-        }
-      } catch (error) {
-        console.error("Failed to fetch data from database:", error);
-      }
-    };
-
-    fetchTrackerData();
-  }, [isAuthenticated, getAccessTokenSilently]);
-
-
-  // 2. ADD GOAL TO DATABASE
-  const addGoal = async (name: string, description: string) => {
+  // 1. Fetch real data from your Supabase Backend
+  const loadData = useCallback(async () => {
     try {
       const token = await getAccessTokenSilently();
       const response = await fetch("http://localhost:5002/api/goals", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      
+      // Map the backend Database schema to match your existing Frontend components
+      if (Array.isArray(data)) {
+        const mappedGoals = data.map((g: any) => ({
+          id: g.id,
+          name: g.title,
+          description: `Target: ${g.target_value}`,
+          createdAt: g.deadline || new Date().toISOString(),
+        }));
+        
+        const mappedHabits = data.flatMap((g: any) => 
+          (g.habits || []).map((h: any) => ({
+            id: h.id,
+            goalId: h.goal_id,
+            name: h.name,
+            type: h.type,
+            // Map backend "logs" to frontend "completions"
+            completions: h.logs ? h.logs.map((l: any) => ({ 
+              date: l.date.split('T')[0], 
+              friction: l.friction_rating, 
+              note: l.friction_note,
+              progress: l.progress_made || 1 
+            })) : [],
+            createdAt: h.created_at,
+          }))
+        );
+
+        setGoals(mappedGoals);
+        setHabits(mappedHabits);
+      }
+    } catch (error) {
+      console.error("Failed to load data from backend:", error);
+    }
+  }, [getAccessTokenSilently]);
+
+  // Load data immediately when the page opens
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 2. Save a new Goal directly to the Database
+  const addGoal = async (name: string, description: string) => {
+    try {
+      const token = await getAccessTokenSilently();
+      await fetch("http://localhost:5002/api/goals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          title: name, // Backend expects 'title'
-        }),
+        body: JSON.stringify({
+          title: name,
+          target_value: 100, // We will update AddGoalDialog to ask for this later!
+        })
       });
-
-      const newGoal = await response.json();
-      setGoals([...goals, { ...newGoal, name: newGoal.title }]);
-    } catch (error) {
-      console.error("Failed to create goal:", error);
+      loadData(); // Refresh UI after saving
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // 3. ADD HABIT TO DATABASE
+  // 3. Save a new Habit directly to the Database
   const addHabit = async (goalId: string, name: string, type: "growth" | "maintenance") => {
     try {
       const token = await getAccessTokenSilently();
-      const response = await fetch("http://localhost:5002/api/habits", {
+      await fetch("http://localhost:5002/api/habits", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           goal_id: goalId,
           name,
           type,
           frequency: "daily"
-        }),
+        })
       });
-
-      const newHabit = await response.json();
-      setHabits([...habits, { ...newHabit, goalId: newHabit.goal_id, completions: [] }]);
-    } catch (error) {
-      console.error("Failed to create habit:", error);
+      loadData(); // Refresh UI after saving
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  // 4. PREPARE HABIT CHECK-IN
+  // Triggered when clicking a habit checkbox
   const toggleHabit = (habitId: string) => {
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return;
@@ -108,76 +116,70 @@ export function TrackerPage() {
     const today = new Date().toISOString().split("T")[0];
     const isCompletedToday = habit.completions.some((c) => c.date === today);
 
-    if (isCompletedToday) {
-      // Uncomplete locally (UI only for MVP)
-      setHabits(
-        habits.map((h) =>
-          h.id === habitId
-            ? { ...h, completions: h.completions.filter((c) => c.date !== today) }
-            : h
-        )
-      );
+    if (!isCompletedToday) {
+      setCheckInHabit(habit); // Open the friction modal
     } else {
-      // Show friction modal to complete
-      setCheckInHabit(habit);
+      console.log("Habit already checked in today! (Un-check feature coming soon)");
     }
   };
 
-  // 5. SAVE HABIT CHECK-IN TO DATABASE
-  const completeHabitWithFriction = async (friction: number, note: string) => {
+  // 4. Save the Friction Log to the Database!
+ // 1. Add 'progress: number' to the parameters
+  const completeHabitWithFriction = async (friction: number, note: string, progress: number) => {
     if (!checkInHabit) return;
 
     try {
       const token = await getAccessTokenSilently();
-      const today = new Date().toISOString();
-
       await fetch(`http://localhost:5002/api/habits/${checkInHabit.id}/log`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          status: true,
           friction_rating: friction,
           friction_note: note,
-          date: today
-        }),
+          progress_made: progress, // 2. Pass the dynamic progress variable here!
+          date: new Date().toISOString()
+        })
       });
-
-      // Update UI state
-      const completionDate = today.split("T")[0];
-      const completion = {
-        date: completionDate,
-        friction,
-        note,
-      };
-
-      setHabits(
-        habits.map((h) =>
-          h.id === checkInHabit.id
-            ? { ...h, completions: [...(h.completions || []), completion] }
-            : h
-        )
-      );
+      
       setCheckInHabit(null);
-    } catch (error) {
-      console.error("Failed to log habit check-in:", error);
+      loadData(); // Refresh the chart with the new data!
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const deleteGoal = (goalId: string) => {
-    if (confirm("Delete this goal and all its habits? (Local UI only for now)")) {
-      setGoals(goals.filter((g) => g.id !== goalId));
-      setHabits(habits.filter((h) => h.goalId !== goalId));
+  const deleteGoal = async (goalId: string) => {
+    if (confirm("Delete this goal and all its habits?")) {
+      try {
+        const token = await getAccessTokenSilently();
+        
+        const response = await fetch(`http://localhost:5002/api/goals/${goalId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        // NEW: If the backend returns an error (like 404 or 500), catch it!
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Backend refused to delete! Reason:", errorData);
+          alert(`Failed to delete: ${errorData.error}`);
+          return; // Stop the function here so it doesn't run loadData()
+        }
+        
+        loadData(); 
+      } catch (e) {
+        console.error("Failed to reach backend:", e);
+      }
     }
   };
 
-  // Calculate overall stats
-  const todayDate = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
   const totalHabits = habits.length;
   const completedToday = habits.filter((h) =>
-    (h.completions || []).some((c) => c.date === todayDate)
+    h.completions.some((c) => c.date === today)
   ).length;
   const completionPercentage = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
 
@@ -294,14 +296,12 @@ export function TrackerPage() {
         )}
       </div>
 
-      {/* Add Button */}
       <AddGoalDialog
         onAddGoal={addGoal}
         onAddHabit={addHabit}
         goals={goals}
       />
 
-      {/* Friction Modal */}
       {checkInHabit && (
         <FrictionModal
           habitName={checkInHabit.name}
