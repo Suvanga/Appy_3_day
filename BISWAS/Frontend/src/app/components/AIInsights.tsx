@@ -1,90 +1,78 @@
-import { Sparkles, TrendingDown, TrendingUp, Calendar, Clock } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Sparkles, TrendingDown, TrendingUp, Calendar, Clock, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useAuth0 } from "../auth/mockAuth";
 import type { Habit } from "../types";
+
+interface Insight {
+  id: string;
+  insight_text: string;
+  generated_at: string;
+}
 
 interface AIInsightsProps {
   habits: Habit[];
 }
 
 export function AIInsights({ habits }: AIInsightsProps) {
-  // Generate mock insights based on actual data
-  const generateInsights = () => {
-    const insights = [];
-    
-    // Analyze completion patterns by day of week
-    const dayCompletions: { [key: string]: number } = {
-      Sunday: 0, Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0, Saturday: 0
-    };
-    
-    habits.forEach(habit => {
-      habit.completions.forEach(completion => {
-        const date = new Date(completion.date);
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        dayCompletions[dayName]++;
+  const { getAccessTokenSilently } = useAuth0();
+  const [latestInsight, setLatestInsight] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 1. Fetch historical insights on load
+  const fetchInsights = useCallback(async () => {
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch("http://localhost:5002/api/insights", {
+        headers: { Authorization: `Bearer ${token}` }
       });
-    });
-
-    const weakestDay = Object.entries(dayCompletions).reduce((min, [day, count]) => 
-      count < min[1] ? [day, count] : min
-    , ['Sunday', Infinity])[0];
-
-    const strongestDay = Object.entries(dayCompletions).reduce((max, [day, count]) => 
-      count > max[1] ? [day, count] : max
-    , ['Sunday', 0])[0];
-
-    if (habits.length > 0) {
-      insights.push({
-        type: "pattern",
-        icon: Calendar,
-        title: "Weekly Pattern Detected",
-        description: `You're most consistent on ${strongestDay}s and struggle on ${weakestDay}s. Consider scheduling important habits on your strongest days.`,
-        color: "#F97316"
-      });
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // Parse the JSON string stored in the database
+        try {
+          const parsedData = JSON.parse(data[0].insight_text);
+          setLatestInsight(parsedData);
+        } catch (e) {
+          console.error("Could not parse AI JSON:", e);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load insights:", error);
+    } finally {
+      setIsLoading(false);
     }
+  }, [getAccessTokenSilently]);
 
-    // Analyze friction patterns
-    const highFrictionHabits = habits.filter(h => {
-      const recentFriction = h.completions.slice(-7).map(c => c.friction || 3);
-      const avgFriction = recentFriction.reduce((a, b) => a + b, 0) / recentFriction.length;
-      return avgFriction > 3.5;
-    });
+  useEffect(() => {
+    fetchInsights();
+  }, [fetchInsights]);
 
-    if (highFrictionHabits.length > 0) {
-      insights.push({
-        type: "friction",
-        icon: TrendingDown,
-        title: "High Friction Alert",
-        description: `"${highFrictionHabits[0].name}" has been challenging lately. Your notes suggest breaking it into smaller steps might help.`,
-        color: "#EF4444"
+  // 2. Trigger Gemini to generate a new insight
+  const generateNewInsight = async () => {
+    setIsGenerating(true);
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch("http://localhost:5002/api/insights/generate", {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(`Could not generate: ${errorData.error}`);
+        setIsGenerating(false);
+        return;
+      }
+      await fetchInsights();
+    } catch (error) {
+      console.error("Failed to generate insight:", error);
+    } finally {
+      setIsGenerating(false);
     }
-
-    // Growth insights
-    const growthHabits = habits.filter(h => h.type === "growth");
-    if (growthHabits.length > 0) {
-      const totalGrowthCompletions = growthHabits.reduce((sum, h) => sum + h.completions.length, 0);
-      insights.push({
-        type: "growth",
-        icon: TrendingUp,
-        title: "Growth Momentum",
-        description: `You've completed ${totalGrowthCompletions} growth-focused activities. You're 23% more consistent with growth habits than last week.`,
-        color: "#10B981"
-      });
-    }
-
-    // Time-based insight
-    insights.push({
-      type: "timing",
-      icon: Clock,
-      title: "Optimal Timing",
-      description: "Your completion rate is 40% higher in the morning. Try scheduling new habits before noon for best results.",
-      color: "#14B8A6"
-    });
-
-    return insights;
   };
 
-  // Generate chart data for last 7 days
+  // Generate chart data for last 7 days (Using local data)
   const generateChartData = () => {
     const data = [];
     for (let i = 6; i >= 0; i--) {
@@ -96,34 +84,69 @@ export function AIInsights({ habits }: AIInsightsProps) {
         return count + (habit.completions.some(c => c.date === dateStr) ? 1 : 0);
       }, 0);
 
-      const avgFriction = habits.reduce((sum, habit) => {
-        const completion = habit.completions.find(c => c.date === dateStr);
-        return sum + (completion?.friction || 0);
-      }, 0) / (completions || 1);
-
       data.push({
         date: date.toLocaleDateString('en-US', { weekday: 'short' }),
         completions,
-        friction: avgFriction,
       });
     }
     return data;
   };
 
-  const insights = generateInsights();
   const chartData = generateChartData();
 
+  // Map the parsed AI data to your UI Cards
+  const displayCards = [
+    {
+      type: "pattern",
+      icon: Calendar,
+      title: "Pattern Recognition",
+      description: latestInsight?.patternRecognition || "Log more habits to unlock your pattern insights! You've got this.",
+      color: "#F97316"
+    },
+    {
+      type: "growth",
+      icon: TrendingUp,
+      title: "Growth Momentum",
+      description: latestInsight?.growthMomentum || "Every step counts. Build your momentum today!",
+      color: "#10B981"
+    },
+    {
+      type: "timing",
+      icon: Clock,
+      title: "Optimal Timing",
+      description: latestInsight?.optimalTiming || "Keep tracking to find out exactly when you perform best.",
+      color: "#14B8A6"
+    }
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F97316]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-br from-[#F97316] to-[#FB923C] rounded-xl">
-          <Sparkles className="text-white" size={24} />
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Header & Button */}
+      <div className="flex items-center justify-between bg-gradient-to-br from-[#1E293B] to-[#334155] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <Sparkles className="text-[#F97316]" size={32} />
+            <h2 className="text-3xl font-bold">AI Growth Coach</h2>
+          </div>
+          <p className="text-gray-300">Personalized, highly motivational insights from your real data.</p>
         </div>
-        <div>
-          <h2 className="text-2xl text-[#1E293B]">AI Growth Coach</h2>
-          <p className="text-sm text-gray-600">Personalized insights from your habit data</p>
-        </div>
+        <button
+          onClick={generateNewInsight}
+          disabled={isGenerating}
+          className="relative z-10 flex items-center gap-2 bg-gradient-to-r from-[#F97316] to-[#FB923C] hover:from-[#EA580C] hover:to-[#F97316] text-white px-6 py-3 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+        >
+          {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <TrendingUp size={20} />}
+          <span>{isGenerating ? "Analyzing Data..." : "Generate New Insights"}</span>
+        </button>
       </div>
 
       {/* Consistency Trend Chart */}
@@ -133,23 +156,9 @@ export function AIInsights({ habits }: AIInsightsProps) {
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
             <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: '12px' }} />
-            <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#FFF',
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                fontSize: '12px'
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="completions"
-              stroke="#F97316"
-              strokeWidth={3}
-              dot={{ fill: '#F97316', r: 4 }}
-              activeDot={{ r: 6 }}
-            />
+            <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} allowDecimals={false} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+            <Line type="monotone" dataKey="completions" stroke="#F97316" strokeWidth={3} dot={{ fill: '#F97316', r: 4 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -157,25 +166,17 @@ export function AIInsights({ habits }: AIInsightsProps) {
       {/* AI Insight Cards */}
       <div className="space-y-3">
         <h3 className="text-lg text-[#1E293B]">Smart Insights</h3>
-        {insights.map((insight, index) => {
+        {displayCards.map((insight, index) => {
           const Icon = insight.icon;
           return (
-            <div
-              key={index}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-            >
-              <div className="flex gap-4">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${insight.color}15` }}
-                >
-                  <Icon size={20} style={{ color: insight.color }} />
+            <div key={index} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex gap-4 items-center">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${insight.color}15` }}>
+                  <Icon size={24} style={{ color: insight.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-[#1E293B] mb-1">{insight.title}</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {insight.description}
-                  </p>
+                  <h4 className="text-[#1E293B] font-semibold mb-1">{insight.title}</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed">{insight.description}</p>
                 </div>
               </div>
             </div>
@@ -184,18 +185,14 @@ export function AIInsights({ habits }: AIInsightsProps) {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gradient-to-br from-[#F97316] to-[#FB923C] rounded-2xl p-5 text-white">
-          <div className="text-3xl mb-1">
-            {habits.reduce((sum, h) => sum + h.completions.length, 0)}
-          </div>
-          <div className="text-sm opacity-90">Total Completions</div>
+      <div className="grid grid-cols-2 gap-3 pb-8">
+        <div className="bg-gradient-to-br from-[#F97316] to-[#FB923C] rounded-2xl p-5 text-white shadow-sm">
+          <div className="text-4xl font-bold mb-1">{habits.reduce((sum, h) => sum + h.completions.length, 0)}</div>
+          <div className="text-sm opacity-90 font-medium">Total Lifetime Completions</div>
         </div>
-        <div className="bg-gradient-to-br from-[#14B8A6] to-[#06B6D4] rounded-2xl p-5 text-white">
-          <div className="text-3xl mb-1">
-            {Math.round((habits.reduce((sum, h) => sum + h.completions.length, 0) / Math.max(habits.length, 1)))}
-          </div>
-          <div className="text-sm opacity-90">Avg per Habit</div>
+        <div className="bg-gradient-to-br from-[#14B8A6] to-[#06B6D4] rounded-2xl p-5 text-white shadow-sm">
+          <div className="text-4xl font-bold mb-1">{habits.length > 0 ? Math.round((habits.reduce((sum, h) => sum + h.completions.length, 0) / habits.length)) : 0}</div>
+          <div className="text-sm opacity-90 font-medium">Average per Habit</div>
         </div>
       </div>
     </div>
