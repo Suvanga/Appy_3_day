@@ -29,6 +29,7 @@ model Goal {
   title        String
   target_value Int
   deadline     DateTime?
+  description  String?   
   status       String    @default("active")
   habits       Habit[]
 
@@ -40,6 +41,7 @@ model Habit {
   goal_id      String
   goal         Goal       @relation(fields: [goal_id], references: [id])
   name         String
+  description  String?   
   type         String     // 'growth' or 'maintenance'
   impact_score Int        @default(1)
   frequency    String     @default("daily")

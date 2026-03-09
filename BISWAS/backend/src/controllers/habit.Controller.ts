@@ -6,7 +6,7 @@ import  prisma  from '../config/db';
 export const createHabit = async (req: Request, res: Response): Promise<void> => {
   try {
     const auth0Id = req.auth?.payload.sub;
-    const { goal_id, name, type, frequency } = req.body;
+    const { goal_id, name, description, type, frequency } = req.body; 
 
     if (!auth0Id) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -41,6 +41,7 @@ export const createHabit = async (req: Request, res: Response): Promise<void> =>
       data: {
         goal_id,
         name,
+        description: description || null,
         type: type || 'growth',
         frequency: frequency || 'daily',
         impact_score: 1, // Default impact score

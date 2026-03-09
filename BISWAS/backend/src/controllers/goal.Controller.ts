@@ -45,7 +45,7 @@ export const createGoal = async (req: Request, res: Response): Promise<void> => 
     const auth0Id = req.auth?.payload.sub;
     
     // Just grab the title, ignore the description for now!
-    const { title } = req.body;
+    const { title, description } = req.body; 
 
     if (!auth0Id) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -65,6 +65,7 @@ export const createGoal = async (req: Request, res: Response): Promise<void> => 
       data: {
         user_id: user.id,
         title,
+        description: description || null,
         target_value: 100, // Default to 100% 
       },
     });

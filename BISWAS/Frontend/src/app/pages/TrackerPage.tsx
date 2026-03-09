@@ -40,7 +40,7 @@ export function TrackerPage() {
             goalId: h.goal_id,
             name: h.name,
             type: h.type,
-            // Map backend "logs" to frontend "completions"
+            description: h.description,
             completions: h.logs ? h.logs.map((l: any) => ({ 
               date: l.date.split('T')[0], 
               friction: l.friction_rating, 
@@ -76,6 +76,7 @@ export function TrackerPage() {
         },
         body: JSON.stringify({
           title: name,
+          description: description,
           target_value: 100, // We will update AddGoalDialog to ask for this later!
         })
       });
@@ -86,8 +87,7 @@ export function TrackerPage() {
   };
 
   // 3. Save a new Habit directly to the Database
-  const addHabit = async (goalId: string, name: string, type: "growth" | "maintenance") => {
-    try {
+const addHabit = async (goalId: string, name: string, type: "growth" | "maintenance", description: string = "") => {    try {
       const token = await getAccessTokenSilently();
       await fetch("http://localhost:5002/api/habits", {
         method: "POST",
@@ -98,6 +98,7 @@ export function TrackerPage() {
         body: JSON.stringify({
           goal_id: goalId,
           name,
+          description,
           type,
           frequency: "daily"
         })

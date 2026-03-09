@@ -16,6 +16,7 @@ export interface Habit {
   id: string;
   goalId: string;
   name: string;
+  description?: string;
   type: "growth" | "maintenance";
   completions: Completion[];
   createdAt: string;

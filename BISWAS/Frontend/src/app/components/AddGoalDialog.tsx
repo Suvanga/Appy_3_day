@@ -3,7 +3,7 @@ import { Plus, X, Target, Zap, Shield } from "lucide-react";
 
 interface AddGoalDialogProps {
   onAddGoal: (name: string, description: string) => void;
-  onAddHabit: (goalId: string, name: string, type: "growth" | "maintenance") => void;
+  onAddHabit: (goalId: string, name: string, type: "growth" | "maintenance", description: string) => void;
   goals: Array<{ id: string; name: string }>;
 }
 
@@ -17,6 +17,7 @@ export function AddGoalDialog({ onAddGoal, onAddHabit, goals }: AddGoalDialogPro
   
   // Habit form
   const [habitName, setHabitName] = useState("");
+  const [habitDescription, setHabitDescription] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState("");
   const [habitType, setHabitType] = useState<"growth" | "maintenance">("growth");
 
@@ -33,8 +34,9 @@ export function AddGoalDialog({ onAddGoal, onAddHabit, goals }: AddGoalDialogPro
   const handleSubmitHabit = (e: React.FormEvent) => {
     e.preventDefault();
     if (habitName.trim() && selectedGoalId) {
-      onAddHabit(selectedGoalId, habitName.trim(), habitType);
+      onAddHabit(selectedGoalId, habitName.trim(), habitType, habitDescription.trim());
       setHabitName("");
+      setHabitDescription(""); // Clear it!
       setHabitType("growth");
       setIsOpen(false);
     }
@@ -135,6 +137,18 @@ export function AddGoalDialog({ onAddGoal, onAddHabit, goals }: AddGoalDialogPro
                 placeholder="e.g., 5k Run"
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F97316]"
                 autoFocus
+              />
+            </div>
+
+            {/* ---> ADDED THE DESCRIPTION BOX HERE <--- */}
+            <div>
+              <label className="block text-sm mb-2 text-gray-700">Description / Context</label>
+              <textarea
+                value={habitDescription}
+                onChange={(e) => setHabitDescription(e.target.value)}
+                placeholder="Why are you doing this habit? (Helps AI give better insights)"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F97316] resize-none"
+                rows={2}
               />
             </div>
 
