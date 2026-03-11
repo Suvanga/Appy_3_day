@@ -1,0 +1,34 @@
+# STEP 1: Builder Stage (Using Debian Slim)
+FROM node:20-slim AS builder
+
+# Install OpenSSL for Prisma
+RUN apt-get update -y && apt-get install -y openssl
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm install
+RUN npx prisma generate
+
+COPY . .
+
+RUN npm run build
+
+# STEP 2: Production Stage
+FROM node:20-slim AS production
+
+# Install OpenSSL in the final image too
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 5002
+
+CMD ["npm", "start"]
