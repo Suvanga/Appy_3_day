@@ -58,3 +58,26 @@ Momentum/
     │   └── app.ts               # Server initialization
     ├── Dockerfile               # Production container definition
     └── package.json
+
+
+Local Development Setup
+1. Clone the repository
+
+Bash
+git clone [https://github.com/YourUsername/Momentum.git](https://github.com/YourUsername/Momentum.git)
+cd Momentum
+2. Setup Backend
+
+Bash
+cd backend
+npm install
+# Create a .env file with DATABASE_URL, DIRECT_URL, and GEMINI_API_KEY
+npx prisma generate
+npm run dev
+3. Setup Frontend
+
+Bash
+cd frontend
+npm install
+# Create a .env file with VITE_AUTH0_DOMAIN, VITE_AUTH0_CLIENT_ID, VITE_AUTH0_AUDIENCE
+npm run dev
