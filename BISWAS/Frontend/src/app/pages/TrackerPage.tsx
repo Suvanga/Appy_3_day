@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth0 } from "../auth/mockAuth";
+import { useAuth0 } from "@auth0/auth0-react";
 import { LayoutDashboard, Sparkles, Trash2, LogOut, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 import { GoalCard } from "../components/GoalCard";
@@ -253,7 +253,7 @@ const addHabit = async (goalId: string, name: string, type: "growth" | "maintena
           </div>
         </div>
       </div>
-
+ 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
         {activeTab === "dashboard" ? (
@@ -293,7 +293,7 @@ const addHabit = async (goalId: string, name: string, type: "growth" | "maintena
             )}
           </>
         ) : (
-          <AIInsights habits={habits} />
+          <AIInsights habits={habits} goals={goals} />
         )}
       </div>
 

@@ -1,4 +1,4 @@
-import { useAuth0 } from "../auth/mockAuth";
+import { useAuth0 } from "@auth0/auth0-react";
 import { LogIn } from "lucide-react";
 
 export function LoginPage() {

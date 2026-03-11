@@ -6,25 +6,31 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // GET /api/insights/generate
+// GET /api/insights/generate
 export const generateInsight = async (req: Request, res: Response): Promise<void> => {
   try {
     const auth0Id = req.auth?.payload.sub;
+    const targetGoalId = req.query.goalId as string; // <-- 1. Catch the new query parameter
     
     if (!auth0Id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    // 1. Find the User
     const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id } });
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    // 2. Gather all context from the database
+    // 2. Filter the database query based on the dropdown selection!
+    const whereClause: any = { user_id: user.id };
+    if (targetGoalId && targetGoalId !== 'all') {
+      whereClause.id = targetGoalId;
+    }
+
     const goals = await prisma.goal.findMany({
-      where: { user_id: user.id },
+      where: whereClause,
       include: { 
         habits: {
           include: { logs: true } 
@@ -33,31 +39,34 @@ export const generateInsight = async (req: Request, res: Response): Promise<void
     });
 
     if (goals.length === 0) {
-      res.status(400).json({ error: 'Not enough data to generate insights. Add some goals first!' });
+      res.status(400).json({ error: 'Not enough data to generate insights for this selection.' });
       return;
     }
 
     const userDataString = JSON.stringify(goals, null, 2);
     
+    // 3. Update the prompt to aggressively focus on descriptions
     const prompt = `
       You are an expert, highly motivational habit coach and productivity mentor.
-      Analyze this user's raw habit data:
+      Analyze this user's raw goal and habit data:
       ${userDataString}
       
-      Provide three distinct, highly encouraging coaching insights based on their real data. 
+      CRITICAL INSTRUCTION: Pay special attention to the "description" fields for both the Goals and Habits. This is the user's "Why" and their personal context. 
+      Combine their descriptions with their actual habit logs (progress_made and friction_rating) to give highly customized, specific advice.
+      
+      Provide three distinct, highly encouraging coaching insights based on this real data. 
       Make them feel confident, happy, and hyped about their progress!
       
       You MUST return exactly and ONLY a valid JSON object with the following three keys. Do not include markdown formatting like \`\`\`json. Just the raw JSON object.
       {
-        "patternRecognition": "A motivational insight about their daily/weekly patterns. (e.g., 'You are a Tuesday rockstar!') Keep under 2 sentences.",
-        "growthMomentum": "An energetic insight celebrating their progress, streaks, or impact. Keep under 2 sentences.",
+        "patternRecognition": "A motivational insight about their daily/weekly patterns. Keep under 2 sentences.",
+        "growthMomentum": "An energetic insight celebrating their progress, referring directly to their goal/habit descriptions. Keep under 2 sentences.",
         "optimalTiming": "A smart, encouraging suggestion about timing, friction, or when they perform best. Keep under 2 sentences."
       }
     `;
 
-    console.log("🧠 Sending data to Gemini...");
+    console.log(`🧠 Sending data to Gemini for goal: ${targetGoalId || 'ALL'}`);
 
-    // 4. Call Gemini 2.5 Flash AND Force JSON Output
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: {
@@ -67,17 +76,13 @@ export const generateInsight = async (req: Request, res: Response): Promise<void
     
     const result = await model.generateContent(prompt);
     let text = result.response.text();
-
-    // Clean the response just in case Gemini tries to add markdown code blocks
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    console.log("✨ Insight generated successfully! Raw output:", text);    
-    
     const newInsight = await prisma.aIInsight.create({
       data: {
         user_id: user.id,
         insight_text: text,
-        context_tags: ['gemini-2.5-flash'] // Updated tag to 2.5!
+        context_tags: ['gemini-2.5-flash']
       }
     });
 
@@ -88,7 +93,6 @@ export const generateInsight = async (req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Failed to generate AI insight' });
   }
 };
-
 // GET /api/insights
 // Fetches past insights for the dashboard
 export const getInsights = async (req: Request, res: Response): Promise<void> => {

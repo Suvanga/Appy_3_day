@@ -1,4 +1,4 @@
-import { Auth0Provider, useAuth0 } from "./auth/mockAuth";
+import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
