@@ -3,8 +3,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
-
+//Trigerring ec2 instance one more time 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
-//triggerring ec2 instance 
+ 
