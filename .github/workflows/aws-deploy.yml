@@ -1,43 +1,62 @@
-name: Deploy Backend to AWS ECR
+name: Deploy Backend to AWS EC2
 
-# This tells GitHub to run this script ONLY when you push to the main branch
 on:
   push:
     branches:
       - main
     paths:
-      - 'BISWAS/backend/**' # <-- UPDATED: Now looks inside the BISWAS folder!
+      - 'BISWAS/backend/**'
 
 jobs:
-  build-and-push:
-    name: Build Docker Image and Push to ECR
+  build-and-deploy:
+    name: Build and Deploy to EC2
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Grab your code from GitHub
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 2. Log into your AWS Account using your Secrets
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: us-east-2
 
-    # 3. Log into the specific ECR Vault
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    # 4. Build the Docker Image and Push it!
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build and Push Docker Image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: momentum-backend
         IMAGE_TAG: latest
       run: |
-        cd BISWAS/backend # <-- UPDATED: Now navigates to the correct folder!
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        # Build using the folder BISWAS/backend as the context
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./BISWAS/backend
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu 
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # 1. Log the EC2 server into ECR
+          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+          
+          # 2. Pull the newly built image
+          docker pull ${{ steps.login-ecr.outputs.registry }}/momentum-backend:latest
+          
+          # 3. Stop the old Momentum container (Leaves MediScan alone)
+          docker stop momentum-backend || true
+          docker rm momentum-backend || true
+          
+          # 4. Run the new container on Port 5002
+          docker run -d --name momentum-backend -p 5002:5002 \
+            -e GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
+            -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            -e DIRECT_URL=${{ secrets.DIRECT_URL }} \
+            ${{ steps.login-ecr.outputs.registry }}/momentum-backend:latest
