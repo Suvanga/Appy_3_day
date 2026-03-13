@@ -14,18 +14,21 @@ const MOTIVATIONAL_QUOTES = [
   { quote: "Great things never come from comfort zones.", author: "Unknown" },
 ];
 
+// Use the environment variable for the AWS backend, fallback to local for development
+const API_BASE = import.meta.env.VITE_API_BASE_URL ;
+
 export function HomePage() {
   const { user, logout, isAuthenticated, getAccessTokenSilently } = useAuth0();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [quote] = useState(() => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
 
-  // THIS IS THE NEW BACKEND SYNC EFFECT
   useEffect(() => {
     const syncUserToBackend = async () => {
       if (isAuthenticated && user) {
         try {
           const token = await getAccessTokenSilently();
-          const response = await fetch("http://localhost:5002/api/users", {
+          // Updated to use API_BASE for cloud connectivity
+          const response = await fetch(`${API_BASE}/api/users`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -37,7 +40,7 @@ export function HomePage() {
             }),
           });
           const data = await response.json();
-          console.log("Supabase User Sync:", data);
+          console.log("Cloud User Sync:", data);
         } catch (error) {
           console.error("Failed to sync user to backend:", error);
         }
@@ -47,7 +50,6 @@ export function HomePage() {
     syncUserToBackend();
   }, [isAuthenticated, user, getAccessTokenSilently]);
 
-  // Original clock timer effect
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -77,7 +79,6 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -102,10 +103,8 @@ export function HomePage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="space-y-8">
-          {/* Greeting & Time Card */}
           <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
             <div className="text-center space-y-4">
               <h2 className="text-2xl text-gray-600">{getGreeting()}, {user?.name?.split(' ')[0] || 'there'}!</h2>
@@ -128,7 +127,6 @@ export function HomePage() {
             </div>
           </div>
 
-          {/* User Profile Card */}
           {user && (
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <div className="flex items-center gap-4">
@@ -147,7 +145,6 @@ export function HomePage() {
             </div>
           )}
 
-          {/* Action Button */}
           <div className="text-center">
             <Link
               to="/tracker"
@@ -159,7 +156,6 @@ export function HomePage() {
             </Link>
           </div>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl p-6 text-center border border-gray-100">
               <div className="text-3xl text-[#F97316] mb-2">🎯</div>

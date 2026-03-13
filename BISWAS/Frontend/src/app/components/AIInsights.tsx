@@ -15,11 +15,11 @@ export function AIInsights({ habits, goals }: AIInsightsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGoalId, setSelectedGoalId] = useState<string>("all");
-
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
   const fetchInsights = useCallback(async () => {
     try {
       const token = await getAccessTokenSilently();
-      const response = await fetch("http://localhost:5002/api/insights", {
+      const response = await fetch(`${API_BASE}/api/insights`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
@@ -47,8 +47,8 @@ export function AIInsights({ habits, goals }: AIInsightsProps) {
     setIsGenerating(true);
     try {
       const token = await getAccessTokenSilently();
-      
-      let url = "http://localhost:5002/api/insights/generate";
+
+      let url = `${API_BASE}/api/insights/generate`;
       if (selectedGoalId !== "all") {
         url += `?goalId=${selectedGoalId}`;
       }
