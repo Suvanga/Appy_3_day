@@ -167,6 +167,27 @@ export function TrackerPage() {
     }
   };
 
+  const deleteHabit = async (habitId: string) => {
+  if (confirm("Are you sure you want to delete this habit?")) {
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch(`${API_BASE}/api/habits/${habitId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        alert("Failed to delete habit");
+        return;
+      }
+      loadData(); // Refresh the data from AWS
+    } catch (e) {
+      console.error("Failed to delete habit:", e);
+    }
+  }
+};
+
+
   // Rendering logic remains same as your original...
   const todayDate = new Date().toISOString().split("T")[0];
   const totalHabits = habits.length;
@@ -223,7 +244,11 @@ export function TrackerPage() {
           <div className="space-y-6">
             {goals.map((goal) => (
               <div key={goal.id} className="relative group">
-                <GoalCard goal={goal} habits={habits} onToggleHabit={toggleHabit} />
+                <GoalCard 
+                goal={goal} 
+                habits={habits} 
+                onToggleHabit={toggleHabit} 
+                onDeleteHabit={deleteHabit} />
                 <button onClick={() => deleteGoal(goal.id)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
                   <Trash2 size={18} />
                 </button>

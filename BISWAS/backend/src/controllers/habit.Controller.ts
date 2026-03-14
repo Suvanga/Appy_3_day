@@ -99,3 +99,39 @@ export const checkInHabit = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+// DELETE /api/habits/:id
+export const deleteHabit = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const auth0Id = req.auth?.payload.sub;
+    const habit_id = req.params.id;
+
+    if (!auth0Id) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // 1. Find the habit and its associated user
+    const habit = await prisma.habit.findUnique({
+      where: { id: habit_id },
+      include: { goal: true }
+    });
+
+    const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id }});
+
+    if (!habit || !user || habit.goal.user_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden: You do not own this habit' });
+      return;
+    }
+
+    // 2. Delete the habit (Prisma will automatically delete associated logs if you have onCascade delete set)
+    await prisma.habit.delete({
+      where: { id: habit_id },
+    });
+
+    res.status(200).json({ message: 'Habit deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting habit:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};

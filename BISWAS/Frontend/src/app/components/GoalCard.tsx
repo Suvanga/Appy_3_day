@@ -1,13 +1,14 @@
-import { CircleCheck, Circle, TrendingUp, Target } from "lucide-react";
+import { CircleCheck, Circle, TrendingUp, Target, Trash2 } from "lucide-react";
 import type { Goal, Habit } from "../types";
 
 interface GoalCardProps {
   goal: Goal;
   habits: Habit[];
   onToggleHabit: (habitId: string) => void;
+  onDeleteHabit: (habitId: string) => void;
 }
 
-export function GoalCard({ goal, habits, onToggleHabit }: GoalCardProps) {
+export function GoalCard({ goal, habits, onToggleHabit, onDeleteHabit }: GoalCardProps) {
   const today = new Date().toISOString().split("T")[0];
   const goalHabits = habits.filter((h) => h.goalId === goal.id);
   
@@ -129,6 +130,15 @@ export function GoalCard({ goal, habits, onToggleHabit }: GoalCardProps) {
                   </span>
                 </div>
               </div>
+
+              {/* NEW: Delete Button for Habit */}
+              <button 
+                onClick={() => onDeleteHabit(habit.id)}
+                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all mr-2"
+                title="Delete Habit"
+              >
+                <Trash2 size={16} />
+              </button>
 
               {/* Streak indicator */}
               <div className="flex items-center gap-1 text-sm text-gray-500">
