@@ -1,33 +1,57 @@
 import { useState, useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import { Calendar, LogOut, ArrowRight } from "lucide-react";
+import { Calendar, LogOut, ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const MOTIVATIONAL_QUOTES = [
+// We keep this as a "fallback" just in case the API fails
+const FALLBACK_QUOTES = [
   { quote: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
   { quote: "The secret of getting ahead is getting started.", author: "Mark Twain" },
   { quote: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", author: "Aristotle" },
-  { quote: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-  { quote: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-  { quote: "The future depends on what you do today.", author: "Mahatma Gandhi" },
-  { quote: "Your limitation—it's only your imagination.", author: "Unknown" },
-  { quote: "Great things never come from comfort zones.", author: "Unknown" },
 ];
 
-// Use the environment variable for the AWS backend, fallback to local for development
-const API_BASE = import.meta.env.VITE_API_BASE_URL ;
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export function HomePage() {
   const { user, logout, isAuthenticated, getAccessTokenSilently } = useAuth0();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [quote] = useState(() => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+  
+  // New State for dynamic quotes
+  const [quote, setQuote] = useState({ quote: "", author: "" });
+  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
 
+  // 1. Fetch Dynamic Quote from API
+  useEffect(() => {
+    const fetchQuote = async () => {
+      try {
+        // ZenQuotes provides a random quote endpoint that does not require an API key
+        // We use a proxy URL to avoid CORS issues on the frontend
+        const response = await fetch("https://api.allorigins.win/get?url=" + encodeURIComponent("https://zenquotes.io/api/random"));
+        const data = await response.json();
+        const parsedData = JSON.parse(data.contents);
+        
+        setQuote({
+          quote: parsedData[0].q,
+          author: parsedData[0].a
+        });
+      } catch (error) {
+        console.error("Failed to fetch quote, using fallback:", error);
+        // If the API fails, pick a random one from our fallback array
+        setQuote(FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)]);
+      } finally {
+        setIsLoadingQuote(false);
+      }
+    };
+
+    fetchQuote();
+  }, []);
+
+  // 2. Sync User to Backend
   useEffect(() => {
     const syncUserToBackend = async () => {
       if (isAuthenticated && user) {
         try {
           const token = await getAccessTokenSilently();
-          // Updated to use API_BASE for cloud connectivity
           const response = await fetch(`${API_BASE}/api/users`, {
             method: "POST",
             headers: {
@@ -50,6 +74,7 @@ export function HomePage() {
     syncUserToBackend();
   }, [isAuthenticated, user, getAccessTokenSilently]);
 
+  // 3. Clock Timer
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -118,12 +143,23 @@ export function HomePage() {
                 </div>
               </div>
 
-              <div className="max-w-2xl mx-auto pt-6 border-t border-gray-100">
-                <blockquote className="text-xl text-[#1E293B] mb-3 italic">
-                  "{quote.quote}"
-                </blockquote>
-                <cite className="text-gray-600 not-italic">— {quote.author}</cite>
+              {/* Dynamic Quote Section */}
+              <div className="max-w-2xl mx-auto pt-6 border-t border-gray-100 min-h-[120px] flex flex-col justify-center">
+                {isLoadingQuote ? (
+                  <div className="flex flex-col items-center justify-center text-gray-400">
+                    <Loader2 className="w-6 h-6 animate-spin mb-2 text-[#F97316]" />
+                    <p className="text-sm">Fetching inspiration...</p>
+                  </div>
+                ) : (
+                  <>
+                    <blockquote className="text-xl text-[#1E293B] mb-3 italic transition-opacity duration-500">
+                      "{quote.quote}"
+                    </blockquote>
+                    <cite className="text-gray-600 not-italic">— {quote.author}</cite>
+                  </>
+                )}
               </div>
+
             </div>
           </div>
 
