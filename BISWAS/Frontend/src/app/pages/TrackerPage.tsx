@@ -6,6 +6,7 @@ import { GoalCard } from "../components/GoalCard";
 import { AIInsights } from "../components/AIInsights";
 import { AddGoalDialog } from "../components/AddGoalDialog";
 import { FrictionModal } from "../components/FrictionModal";
+import { TreeGamification } from "../components/TreeGamification";
 import type { Goal, Habit } from "../types";
 
 // Dynamic API URL: Uses the .env value if it exists, otherwise defaults to local for dev
@@ -142,7 +143,7 @@ export function TrackerPage() {
         })
       });
       setCheckInHabit(null);
-      loadData(); 
+      loadData(); // This re-fetches data, increasing total completions, triggering the rain!
     } catch (e) {
       console.error(e);
     }
@@ -222,6 +223,9 @@ export function TrackerPage() {
   ).length;
   const completionPercentage = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
 
+  // NEW: Calculate total lifetime completions to pass into the Tree component
+  const totalLifetimeCompletions = habits.reduce((sum, h) => sum + h.completions.length, 0);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
       <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
@@ -267,6 +271,12 @@ export function TrackerPage() {
       <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
         {activeTab === "dashboard" ? (
           <div className="space-y-6">
+            
+            {/* NEW: Tree Gamification added to the top of the dashboard */}
+            <div className="mb-8">
+              <TreeGamification completionsCount={totalLifetimeCompletions} />
+            </div>
+
             {goals.map((goal) => (
               <div key={goal.id} className="relative group">
                 <GoalCard 
