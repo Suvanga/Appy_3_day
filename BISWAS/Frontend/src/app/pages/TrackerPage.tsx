@@ -17,6 +17,8 @@ export function TrackerPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [checkInHabit, setCheckInHabit] = useState<Habit | null>(null);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
 
   // 1. Fetch real data from your AWS Backend
   const loadData = useCallback(async () => {
@@ -168,27 +170,51 @@ export function TrackerPage() {
   };
 
   const deleteHabit = async (habitId: string) => {
-  if (confirm("Are you sure you want to delete this habit?")) {
+    if (confirm("Are you sure you want to delete this habit?")) {
+      try {
+        const token = await getAccessTokenSilently();
+        const response = await fetch(`${API_BASE}/api/habits/${habitId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          alert("Failed to delete habit");
+          return;
+        }
+        loadData(); 
+      } catch (e) {
+        console.error("Failed to delete habit:", e);
+      }
+    }
+  };
+
+  const saveGoalEdit = async (goalId: string, newTitle: string, newDesc: string) => {
     try {
       const token = await getAccessTokenSilently();
-      const response = await fetch(`${API_BASE}/api/habits/${habitId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
+      await fetch(`${API_BASE}/api/goals/${goalId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: newTitle, description: newDesc })
       });
+      setEditingGoal(null);
+      loadData();
+    } catch (e) { console.error("Failed to update goal:", e); }
+  };
 
-      if (!response.ok) {
-        alert("Failed to delete habit");
-        return;
-      }
-      loadData(); // Refresh the data from AWS
-    } catch (e) {
-      console.error("Failed to delete habit:", e);
-    }
-  }
-};
+  const saveHabitEdit = async (habitId: string, newName: string, newType: string) => {
+    try {
+      const token = await getAccessTokenSilently();
+      await fetch(`${API_BASE}/api/habits/${habitId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newName, type: newType })
+      });
+      setEditingHabit(null);
+      loadData();
+    } catch (e) { console.error("Failed to update habit:", e); }
+  };
 
-
-  // Rendering logic remains same as your original...
   const todayDate = new Date().toISOString().split("T")[0];
   const totalHabits = habits.length;
   const completedToday = habits.filter((h) =>
@@ -198,7 +224,6 @@ export function TrackerPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
-      {/* Rest of your JSX remains exactly the same */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -245,10 +270,13 @@ export function TrackerPage() {
             {goals.map((goal) => (
               <div key={goal.id} className="relative group">
                 <GoalCard 
-                goal={goal} 
-                habits={habits} 
-                onToggleHabit={toggleHabit} 
-                onDeleteHabit={deleteHabit} />
+                  goal={goal} 
+                  habits={habits} 
+                  onToggleHabit={toggleHabit} 
+                  onDeleteHabit={deleteHabit}
+                  onEditGoal={(g) => setEditingGoal(g)}
+                  onEditHabit={(h) => setEditingHabit(h)}
+                />
                 <button onClick={() => deleteGoal(goal.id)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
                   <Trash2 size={18} />
                 </button>
@@ -262,6 +290,51 @@ export function TrackerPage() {
 
       <AddGoalDialog onAddGoal={addGoal} onAddHabit={addHabit} goals={goals} />
       {checkInHabit && <FrictionModal habitName={checkInHabit.name} onComplete={completeHabitWithFriction} onCancel={() => setCheckInHabit(null)} />}
+
+      {/* Edit Goal Modal */}
+      {editingGoal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-[#1E293B]">Edit Goal</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              saveGoalEdit(editingGoal.id, formData.get("title") as string, formData.get("description") as string);
+            }}>
+              <input name="title" defaultValue={editingGoal.name} required className="w-full px-4 py-3 rounded-xl border mb-3 focus:ring-2 focus:ring-[#F97316] outline-none" placeholder="Goal Title" />
+              <input name="description" defaultValue={editingGoal.description} className="w-full px-4 py-3 rounded-xl border mb-5 focus:ring-2 focus:ring-[#F97316] outline-none" placeholder="Target / Description" />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setEditingGoal(null)} className="flex-1 px-4 py-3 rounded-xl border font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-[#F97316] text-white font-medium hover:bg-[#EA580C]">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Habit Modal */}
+      {editingHabit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-[#1E293B]">Edit Habit</h2>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              saveHabitEdit(editingHabit.id, formData.get("name") as string, formData.get("type") as string);
+            }}>
+              <input name="name" defaultValue={editingHabit.name} required className="w-full px-4 py-3 rounded-xl border mb-3 focus:ring-2 focus:ring-[#F97316] outline-none" placeholder="Habit Name" />
+              <select name="type" defaultValue={editingHabit.type} className="w-full px-4 py-3 rounded-xl border mb-5 focus:ring-2 focus:ring-[#F97316] outline-none bg-white">
+                <option value="growth">Growth (Building a new habit)</option>
+                <option value="maintenance">Maintenance (Keeping a baseline)</option>
+              </select>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setEditingHabit(null)} className="flex-1 px-4 py-3 rounded-xl border font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 rounded-xl bg-[#F97316] text-white font-medium hover:bg-[#EA580C]">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

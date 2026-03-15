@@ -125,3 +125,30 @@ export const deleteGoal = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+// PUT /api/goals/:id
+export const updateGoal = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const auth0Id = req.auth?.payload.sub;
+    const goalId = req.params.id;
+    const { title, description } = req.body;
+
+    if (!auth0Id) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+    const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id } });
+    const existingGoal = await prisma.goal.findUnique({ where: { id: goalId } });
+
+    if (!user || !existingGoal || existingGoal.user_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden' }); return;
+    }
+
+    const updatedGoal = await prisma.goal.update({
+      where: { id: goalId },
+      data: { title, description }
+    });
+    res.status(200).json(updatedGoal);
+  } catch (error) {
+    console.error('Error updating goal:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};

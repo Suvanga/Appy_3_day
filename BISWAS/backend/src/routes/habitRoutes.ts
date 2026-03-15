@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createHabit, checkInHabit, deleteHabit } from '../controllers/habit.Controller';
+import { createHabit, checkInHabit, deleteHabit, updateHabit } from '../controllers/habit.Controller';
 import { checkJwt } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -14,4 +14,7 @@ router.post('/', createHabit);
 router.post('/:id/log', checkInHabit);
 
 router.delete('/:id', deleteHabit);
+
+router.put('/:id', updateHabit);
+
 export default router;

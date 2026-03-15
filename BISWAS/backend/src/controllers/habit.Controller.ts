@@ -135,3 +135,30 @@ export const deleteHabit = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+// PUT /api/habits/:id
+export const updateHabit = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const auth0Id = req.auth?.payload.sub;
+    const habitId = req.params.id;
+    const { name, type } = req.body;
+
+    if (!auth0Id) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+    const user = await prisma.user.findUnique({ where: { auth0_id: auth0Id } });
+    const existingHabit = await prisma.habit.findUnique({ where: { id: habitId }, include: { goal: true } });
+
+    if (!user || !existingHabit || existingHabit.goal.user_id !== user.id) {
+      res.status(403).json({ error: 'Forbidden' }); return;
+    }
+
+    const updatedHabit = await prisma.habit.update({
+      where: { id: habitId },
+      data: { name, type }
+    });
+    res.status(200).json(updatedHabit);
+  } catch (error) {
+    console.error('Error updating habit:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};

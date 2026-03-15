@@ -1,4 +1,4 @@
-import { CircleCheck, Circle, TrendingUp, Target, Trash2 } from "lucide-react";
+import { CircleCheck, Circle, TrendingUp, Target, Trash2, Pencil } from "lucide-react";
 import type { Goal, Habit } from "../types";
 
 interface GoalCardProps {
@@ -6,11 +6,17 @@ interface GoalCardProps {
   habits: Habit[];
   onToggleHabit: (habitId: string) => void;
   onDeleteHabit: (habitId: string) => void;
+  onEditGoal: (goal: Goal) => void;
+  onEditHabit: (habit: Habit) => void;
 }
 
-export function GoalCard({ goal, habits, onToggleHabit, onDeleteHabit }: GoalCardProps) {
+export function GoalCard({ goal, habits, onToggleHabit, onDeleteHabit, onEditGoal, onEditHabit }: GoalCardProps) {
+
   const today = new Date().toISOString().split("T")[0];
-  const goalHabits = habits.filter((h) => h.goalId === goal.id);
+  // Filter for this goal, then auto-sort them so "growth" and "maintenance" are grouped together
+  const goalHabits = habits
+    .filter((h) => h.goalId === goal.id)
+    .sort((a, b) => a.type.localeCompare(b.type));
   
   const completedToday = goalHabits.filter((h) =>
     h.completions.some((c) => c.date === today)
@@ -40,7 +46,10 @@ export function GoalCard({ goal, habits, onToggleHabit, onDeleteHabit }: GoalCar
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Target size={20} className="text-[#1E293B]" />
-            <h2 className="text-xl text-[#1E293B]">{goal.name}</h2>
+            <h2 className="text-xl text-[#1E293B] mr-2">{goal.name}</h2>
+            <button onClick={() => onEditGoal(goal)} className="p-1 text-gray-400 hover:text-blue-500 transition-all opacity-0 group-hover:opacity-100" title="Edit Goal">
+              <Pencil size={16} />
+            </button>
           </div>
           {goal.description && (
             <p className="text-sm text-gray-600">{goal.description}</p>
@@ -130,8 +139,14 @@ export function GoalCard({ goal, habits, onToggleHabit, onDeleteHabit }: GoalCar
                   </span>
                 </div>
               </div>
-
-              {/* NEW: Delete Button for Habit */}
+              <button 
+                onClick={() => onEditHabit(habit)}
+                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-500 transition-all"
+                title="Edit Habit"
+              >
+                <Pencil size={16} />
+              </button>
+              {/* Delete Button for Habit */}
               <button 
                 onClick={() => onDeleteHabit(habit.id)}
                 className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all mr-2"
