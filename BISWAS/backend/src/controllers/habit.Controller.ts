@@ -101,6 +101,7 @@ export const checkInHabit = async (req: Request, res: Response): Promise<void> =
 };
 
 // DELETE /api/habits/:id
+// DELETE /api/habits/:id
 export const deleteHabit = async (req: Request, res: Response): Promise<void> => {
   try {
     const auth0Id = req.auth?.payload.sub;
@@ -124,7 +125,12 @@ export const deleteHabit = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // 2. Delete the habit (Prisma will automatically delete associated logs if you have onCascade delete set)
+    // 2. MANUALLY CASCADE: Delete all associated habit logs first
+    await prisma.habitLog.deleteMany({
+      where: { habit_id: habit_id }
+    });
+
+    // 3. Now it is safe to delete the habit itself
     await prisma.habit.delete({
       where: { id: habit_id },
     });
