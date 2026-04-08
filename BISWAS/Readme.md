@@ -11,8 +11,8 @@
 
 The application is fully containerized and deployed using industry-standard **AWS Infrastructure** with automated CI/CD pipelines.
 
-📄 **Live Application:** [Link coming soon]
-📡 **API Documentation:** [Link coming soon]
+📄 **Live Application:**  https://momentum.suvanga.com
+
 
 ---
 
